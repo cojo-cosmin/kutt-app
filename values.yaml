@@ -1,0 +1,74 @@
+namespaces:
+  db: db
+  app: kutt-app
+  vault: vault
+
+zalando:
+  namespace: db
+  teamId: acid
+  name: appdb
+  instances: 1
+  storageSize: 1Gi
+  pgVersion: "16"
+
+vaultAddress: "http://vault.vault.svc:8200"
+
+vso:
+  enabled: true
+
+kutt:
+  enabled: true
+  image: "kutt:local"
+  replicas: 1
+  port: 3000
+  defaultDomain: "127.0.0.1:8080"
+  siteName: "Kutt"
+  dbSSL: "true"
+  disallowAnonymousLinks: false
+
+secretNames:
+  kuttEnv: "kutt-jwt-token" 
+
+vsoObjects:
+  vaultNamespace: ""       
+  authMount: "kubernetes"
+  vaultAuthRef: "app-auth"
+  vaultK8sRole: "kutt-app"
+  kvMount: "secret"         
+  kvPath: "kutt-jwt-token"         
+  audiences: ["vault"]    
+  dbCredsPath: "creds/kutt-app-role"
+
+secret:
+  name: db-creds
+  refreshAfter: "30m"
+  mapping:
+    userKey: DB_USER
+    passKey: DB_PASSWORD
+    hostKey: DB_HOST
+    nameKey: DB_NAME
+    portKey: DB_PORT
+    urlKey:  DATABASE_URL
+
+appDb:
+  dbName: "postgres"
+  port: "5432"
+  schema: "public"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+  anyHost: true
+  hosts: []
+
+vaultBootstrap:
+  enabled: true
+  token: "root"
+  dbRoleName: "kutt-app-role"
+  dbConnName: "kutt-app-pg-db"
+  dbPolicyName: "kutt-app-role"
+  defaultTTL: "1h"
+  maxTTL: "24h"

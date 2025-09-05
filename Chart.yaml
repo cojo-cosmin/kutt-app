@@ -1,0 +1,17 @@
+apiVersion: v2
+name: kutt-app
+description: Kutt self-hosted URL shortener
+type: application
+version: 0.1.0
+appVersion: "1.0"
+
+dependencies:
+  - name: vault
+    version: "0.28.0"
+    repository: "https://helm.releases.hashicorp.com"
+    condition: vault.enabled
+
+  - name: vault-secrets-operator
+    version: "0.7.0"
+    repository: "https://helm.releases.hashicorp.com"
+    condition: vso.enabled

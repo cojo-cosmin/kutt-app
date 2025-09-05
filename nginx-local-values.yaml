@@ -1,0 +1,16 @@
+controller:
+  ingressClass: nginx
+  ingressClassResource:
+    name: nginx
+    enabled: true
+    default: false
+  watchIngressWithoutClass: false
+
+  service:
+    type: ClusterIP
+
+  config:
+    server-tokens: "false"
+    proxy-body-size: "10m"
+    proxy-read-timeout: "60"
+    proxy-send-timeout: "60"
