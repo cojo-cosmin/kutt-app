@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kutt
+  namespace: {{ .Values.namespaces.app }}
+spec:
+  selector: { app: kutt }
+  ports:
+    - name: http
+      port: 80
+      targetPort: {{ .Values.kutt.port }}

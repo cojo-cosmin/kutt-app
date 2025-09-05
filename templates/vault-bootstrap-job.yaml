@@ -1,0 +1,100 @@
+{{- if .Values.vaultBootstrap.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-bootstrap
+  namespace: {{ .Values.zalando.namespace }}
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+
+      initContainers:
+      - name: wait-for-pg
+        image: postgres:16
+        command: ["bash","-lc"]
+        args:
+        - |
+          set -e
+          for i in $(seq 1 120); do
+            pg_isready -h {{ .Values.zalando.name }}.{{ .Values.zalando.namespace }}.svc -p {{ .Values.appDb.port }} && exit 0
+            sleep 2
+          done
+          echo "Postgres not ready" >&2; exit 1
+
+      containers:
+      - name: vault-init
+        image: hashicorp/vault:1.16
+        env:
+        - name: VAULT_ADDR
+          value: {{ $.Values.vaultAddress | quote }}
+        - name: VAULT_TOKEN
+          value: {{ .Values.vaultBootstrap.token | quote }}
+        - name: PG_SUPER_PASS
+          valueFrom:
+            secretKeyRef:
+              name: postgres.{{ .Values.zalando.name }}.credentials.postgresql.acid.zalan.do
+              key: password
+        command: ["sh","-c"]
+        args:
+        - |
+          set -euo pipefail
+
+          # Enable/Configure Kubernetes auth (idempotent)
+          (vault auth enable {{ $.Values.vsoObjects.authMount }} || true)
+          K8S_HOST="https://${KUBERNETES_PORT_443_TCP_ADDR}:443"
+          vault write auth/{{ $.Values.vsoObjects.authMount }}/config kubernetes_host="${K8S_HOST}" || true
+
+          # Enable DB secrets engine (idempotent)
+          (vault secrets enable database || true)
+
+          # Create/Update DB connection (Zalando requires TLS)
+          vault write database/config/{{ .Values.vaultBootstrap.dbConnName }} \
+            plugin_name="postgresql-database-plugin" \
+            allowed_roles="{{ .Values.vaultBootstrap.dbRoleName }}" \
+            connection_url="postgresql://{{`{{username}}`}}:{{`{{password}}`}}@{{ .Values.zalando.name }}.{{ .Values.zalando.namespace }}.svc:{{ .Values.appDb.port }}/{{ .Values.appDb.dbName }}?sslmode=require" \
+            username="postgres" password="${PG_SUPER_PASS}"
+
+          # Prepare clean SQL (no comments) to avoid parsing/quoting issues
+          cat >/tmp/role.sql <<'SQL'
+          CREATE ROLE "{{`{{name}}`}}" WITH LOGIN PASSWORD '{{`{{password}}`}}' VALID UNTIL '{{`{{expiration}}`}}';
+          ALTER ROLE "{{`{{name}}`}}" SET search_path TO {{ .Values.appDb.schema }};
+          GRANT CONNECT ON DATABASE {{ .Values.appDb.dbName }} TO "{{`{{name}}`}}";
+          GRANT USAGE, CREATE ON SCHEMA {{ .Values.appDb.schema }} TO "{{`{{name}}`}}";
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {{ .Values.appDb.schema }} TO "{{`{{name}}`}}";
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA {{ .Values.appDb.schema }} TO "{{`{{name}}`}}";
+          SQL
+
+          # Create/Update the Vault DB role that mints short-lived users
+          vault write database/roles/{{ .Values.vaultBootstrap.dbRoleName }} \
+            db_name={{ .Values.vaultBootstrap.dbConnName }} \
+            creation_statements=@/tmp/role.sql \
+            default_ttl={{ .Values.vaultBootstrap.defaultTTL }} \
+            max_ttl={{ .Values.vaultBootstrap.maxTTL }}
+
+          # Policy that allows reading the dynamic creds
+          cat >/tmp/policy.hcl <<'HCL'
+          path "database/creds/{{ .Values.vaultBootstrap.dbRoleName }}" { capabilities = ["read"] }
+          path "{{ .Values.vsoObjects.kvMount }}/data/{{ .Values.vsoObjects.kvPath }}" { capabilities = ["read"] }
+          path "{{ .Values.vsoObjects.kvMount }}/metadata/{{ .Values.vsoObjects.kvPath }}" { capabilities = ["read"] }
+          HCL
+          vault policy write {{ .Values.vaultBootstrap.dbPolicyName }} /tmp/policy.hcl || true
+
+          # Bind app ServiceAccount to the Vault role
+          vault write auth/{{ $.Values.vsoObjects.authMount }}/role/{{ $.Values.vsoObjects.vaultK8sRole }} \
+            bound_service_account_names=app-sa \
+            bound_service_account_namespaces={{ $.Values.namespaces.app }} \
+            policies=default,{{ .Values.vaultBootstrap.dbPolicyName }} \
+            audience=vault ttl=24h || true
+
+          echo "Done."
+
+          if ! vault kv get -field=JWT_SECRET {{ .Values.vsoObjects.kvMount }}/{{ .Values.vsoObjects.kvPath }} >/dev/null 2>&1; then
+            JWT="$(dd if=/dev/urandom bs=32 count=1 2>/dev/null | base64 | tr -dc 'A-Za-z0-9' | head -c 64)"
+            vault kv put {{ .Values.vsoObjects.kvMount }}/{{ .Values.vsoObjects.kvPath }} JWT_SECRET="$JWT"
+            echo "Seeded Vault KV {{ .Values.vsoObjects.kvMount }}/{{ .Values.vsoObjects.kvPath }}"
+          else
+            echo "Vault KV {{ .Values.vsoObjects.kvMount }}/{{ .Values.vsoObjects.kvPath }} already present (leaving as-is)"
+          fi
+{{- end }}

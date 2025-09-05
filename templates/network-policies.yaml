@@ -1,0 +1,100 @@
+# 1) KUTT: only allow ingress from NGINX Ingress to the pod port
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kutt-allow-from-ingress
+  namespace: {{ .Values.namespaces.app }}
+  labels:
+    app.kubernetes.io/name: kutt
+    app.kubernetes.io/part-of: pg-vault-shortlived
+    app.kubernetes.io/managed-by: Helm
+spec:
+  podSelector:
+    matchLabels:
+      {{ default "app" .Values.labels.appKey }}: {{ default "kutt" .Values.labels.appValue }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.ingress.controllerNamespace | default "ingress-nginx" | quote }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.kutt.port }}
+---
+# 2) POSTGRES: allow from Kutt on 5432
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-from-kutt
+  namespace: {{ .Values.namespaces.db }}
+  labels:
+    app.kubernetes.io/name: appdb
+    app.kubernetes.io/part-of: pg-vault-shortlived
+    app.kubernetes.io/managed-by: Helm
+spec:
+  podSelector:
+    matchLabels:
+      {{ default "application" .Values.labels.dbKey }}: {{ default "spilo" .Values.labels.dbValue }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespaces.app | quote }}
+          podSelector:
+            matchLabels:
+              {{ default "app" .Values.labels.appKey }}: {{ default "kutt" .Values.labels.appValue }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.appDb.port | int }}
+---
+# 3) POSTGRES: allow from Vault on 5432 (for dynamic creds)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-from-vault
+  namespace: {{ .Values.namespaces.db }}
+  labels:
+    app.kubernetes.io/name: appdb
+    app.kubernetes.io/part-of: pg-vault-shortlived
+    app.kubernetes.io/managed-by: Helm
+spec:
+  podSelector:
+    matchLabels:
+      {{ default "application" .Values.labels.dbKey }}: {{ default "spilo" .Values.labels.dbValue }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespaces.vault | quote }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.appDb.port | int }}
+---
+# 4) POSTGRES: allow intra-DB traffic (replication & Patroni)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-intra-db
+  namespace: {{ .Values.namespaces.db }}
+  labels:
+    app.kubernetes.io/name: appdb
+    app.kubernetes.io/part-of: pg-vault-shortlived
+    app.kubernetes.io/managed-by: Helm
+spec:
+  podSelector:
+    matchLabels:
+      {{ default "application" .Values.labels.dbKey }}: {{ default "spilo" .Values.labels.dbValue }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.namespaces.db | quote }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.appDb.port | int }}
+        - protocol: TCP
+          port: 8008

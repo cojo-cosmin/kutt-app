@@ -1,0 +1,18 @@
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultAuth
+metadata:
+  name: app-auth
+  namespace: {{ .Values.namespaces.app }}
+spec:
+  vaultConnectionRef: vault-conn
+  method: kubernetes
+  mount: {{ .Values.vsoObjects.authMount }}
+  kubernetes:
+    role: {{ .Values.vsoObjects.vaultK8sRole }}
+    serviceAccount: app-sa
+    {{- if .Values.vsoObjects.audiences }}
+    audiences:
+      {{- range .Values.vsoObjects.audiences }}
+      - {{ . | quote }}
+      {{- end }}
+    {{- end }}

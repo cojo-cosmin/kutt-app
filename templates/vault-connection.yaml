@@ -1,0 +1,10 @@
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultConnection
+metadata:
+  name: vault-conn
+  namespace: {{ .Values.namespaces.app }}
+spec:
+  address: {{ .Values.vaultAddress | quote }}
+  {{- if .Values.vsoObjects.vaultNamespace }}
+  vaultNamespace: {{ .Values.vsoObjects.vaultNamespace | quote }}
+  {{- end }}

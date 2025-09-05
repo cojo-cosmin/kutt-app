@@ -1,0 +1,16 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: {{ .Values.zalando.name }}
+  namespace: {{ .Values.zalando.namespace }}
+spec:
+  teamId: {{ .Values.zalando.teamId | quote }}
+  numberOfInstances: {{ .Values.zalando.instances }}
+  volume:
+    size: {{ .Values.zalando.storageSize }}
+  postgresql:
+    version: {{ .Values.zalando.pgVersion | quote }}
+  users:
+    postgres: [superuser]
+  databases:
+    {{ .Values.appDb.dbName }}: postgres
