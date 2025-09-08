@@ -1,24 +1,24 @@
 namespaces:
-  db: db
+  db: kutt-app
   app: kutt-app
-  vault: vault
+  vault: kutt-app
 
 zalando:
-  namespace: db
+  namespace: kutt-app
   teamId: acid
   name: appdb
   instances: 1
   storageSize: 1Gi
   pgVersion: "16"
 
-vaultAddress: "http://vault.vault.svc:8200"
+vaultAddress: "http://kutt-app-vault:8200"
 
 vso:
   enabled: true
 
 kutt:
   enabled: true
-  image: "kutt:local"
+  image: "kutt/kutt:main"
   replicas: 1
   port: 3000
   defaultDomain: "127.0.0.1:8080"
@@ -72,3 +72,31 @@ vaultBootstrap:
   dbPolicyName: "kutt-app-role"
   defaultTTL: "1h"
   maxTTL: "24h"
+
+labels:
+  appKey: "app"
+  appValue: "kutt"
+  dbKey: "application"
+  dbValue: "spilo"
+
+ingress-nginx:
+  controller:
+    ingressClass: nginx
+    ingressClassResource:
+      name: nginx
+      enabled: true
+      default: false
+    watchIngressWithoutClass: false
+    service:
+      type: ClusterIP
+
+vault:
+  server:
+    dev:
+      enabled: true
+    dataStorage:
+      enabled: false
+
+vault-secrets-operator: {}
+
+postgres-operator: {}

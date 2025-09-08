@@ -17,7 +17,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: {{ .Values.ingress.controllerNamespace | default "ingress-nginx" | quote }}
+              kubernetes.io/metadata.name: {{ .Values.ingress.controllerNamespace | default "kutt-app" | quote }}
       ports:
         - protocol: TCP
           port: {{ .Values.kutt.port }}
