@@ -11,7 +11,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      {{ default "app" .Values.labels.appKey }}: {{ default "kutt" .Values.labels.appValue }}
+      {{ default "app" .Values.labels.appKey }}: {{ default "kutt-app" .Values.labels.appValue }}
   policyTypes: ["Ingress"]
   ingress:
     - from:
@@ -44,7 +44,7 @@ spec:
               kubernetes.io/metadata.name: {{ .Values.namespaces.app | quote }}
           podSelector:
             matchLabels:
-              {{ default "app" .Values.labels.appKey }}: {{ default "kutt" .Values.labels.appValue }}
+              {{ default "app" .Values.labels.appKey }}: {{ default "kutt-app" .Values.labels.appValue }}
       ports:
         - protocol: TCP
           port: {{ .Values.appDb.port | int }}

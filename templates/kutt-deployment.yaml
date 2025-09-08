@@ -3,13 +3,17 @@ kind: Deployment
 metadata:
   name: kutt
   namespace: {{ .Values.namespaces.app }}
-  labels: { app: kutt }
+  labels: 
+    {{ default "app" .Values.labels.appKey }}: {{ default "kutt-app" .Values.labels.appValue }}
 spec:
   replicas: {{ .Values.kutt.replicas }}
-  selector: { matchLabels: { app: kutt } }
+  selector:
+    matchLabels:
+      {{ default "app" .Values.labels.appKey }}: {{ default "kutt-app" .Values.labels.appValue }}
   template:
     metadata:
-      labels: { app: kutt }
+      labels:
+        {{ default "app" .Values.labels.appKey }}: {{ default "kutt-app" .Values.labels.appValue }}
     spec:
       serviceAccountName: app-sa
       containers:
@@ -27,8 +31,6 @@ spec:
           value: "pg"
         - name: DB_SSL
           value: {{ .Values.kutt.dbSSL | quote }}
-        - name: PGSSLMODE
-          value: "no-verify"
         - name: NODE_TLS_REJECT_UNAUTHORIZED
           value: "0"
         - name: DEFAULT_DOMAIN

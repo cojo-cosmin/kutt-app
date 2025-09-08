@@ -4,7 +4,8 @@ metadata:
   name: kutt
   namespace: {{ .Values.namespaces.app }}
 spec:
-  selector: { app: kutt }
+  selector:
+    {{ default "app" .Values.labels.appKey }}: {{ default "kutt-app" .Values.labels.appValue }}
   ports:
     - name: http
       port: 80
